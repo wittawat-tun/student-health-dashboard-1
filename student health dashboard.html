@@ -1,0 +1,1555 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ระบบแดชบอร์ดสุขภาพและโภชนาการนักเรียน (Student Health Dashboard)</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Kanit -->
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- SheetJS (XLSX) -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <!-- html2canvas -->
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'sport-dark': '#0B132B',
+                        'sport-card': '#1C2541',
+                        'sport-accent': '#00F5D4',
+                        'sport-blue': '#3A86FF',
+                        'sport-purple': '#8338EC',
+                        'sport-pink': '#FF007F',
+                        'sport-yellow': '#FFBE0B',
+                    },
+                    fontFamily: {
+                        kanit: ['Kanit', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            font-family: 'Kanit', sans-serif;
+            background-color: #0F172A;
+            color: #F8FAFC;
+        }
+
+        .sport-card {
+            background: linear-gradient(145deg, rgba(28, 37, 65, 0.9) 0%, rgba(15, 23, 42, 0.95) 100%);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .glow-accent {
+            box-shadow: 0 0 20px rgba(0, 245, 212, 0.25);
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0F172A;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #475569;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col pb-10">
+
+    <header class="bg-slate-900/90 border-b border-slate-800 sticky top-0 z-40 backdrop-blur-md">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex flex-wrap items-center justify-between gap-4">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-sport-accent to-sport-blue flex items-center justify-center text-slate-950 font-bold text-xl shadow-lg shadow-emerald-500/20">
+                    <i class="fa-solid fa-heart-pulse"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg font-bold text-white leading-tight flex items-center gap-2">
+                        ระบบสถิติสุขภาพและภาวะโภชนาการนักเรียน
+                    </h1>
+                    <p class="text-xs text-slate-400">ประเมินตามเกณฑ์มาตรฐานเด็กและเยาวชนไทย (กรมพลศึกษา / กรมอนามัย)</p>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-2 flex-wrap">
+                <div class="flex items-center gap-2 bg-slate-800/80 px-3 py-1.5 rounded-xl border border-slate-700">
+                    <i class="fa-solid fa-calendar-days text-sport-accent text-xs"></i>
+                    <span class="text-xs text-slate-300 font-semibold">ปีการศึกษา:</span>
+                    <select id="selectedYear" onchange="onPeriodChange()" class="bg-transparent text-xs text-sport-accent font-bold outline-none cursor-pointer">
+                        <option value="2568" class="bg-slate-900 text-white">2568</option>
+                        <option value="2567" class="bg-slate-900 text-white">2567</option>
+                        <option value="2566" class="bg-slate-900 text-white">2566</option>
+                    </select>
+                    <span class="text-slate-600">|</span>
+                    <span class="text-xs text-slate-300 font-semibold">เทอม:</span>
+                    <select id="selectedTerm" onchange="onPeriodChange()" class="bg-transparent text-xs text-sport-accent font-bold outline-none cursor-pointer">
+                        <option value="1" class="bg-slate-900 text-white">1</option>
+                        <option value="2" class="bg-slate-900 text-white">2</option>
+                    </select>
+                </div>
+
+                <button onclick="openHistoryModal()" class="px-3 py-1.5 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border border-purple-500/30 text-xs font-semibold flex items-center gap-1.5 transition">
+                    <i class="fa-solid fa-chart-line"></i> สรุปรายเทอม/รายปี
+                </button>
+
+                <button onclick="openAddModal()" class="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-sport-accent to-emerald-400 hover:from-emerald-400 hover:to-sport-accent text-slate-950 font-bold text-xs flex items-center gap-1.5 shadow-md transition transform active:scale-95">
+                    <i class="fa-solid fa-user-plus"></i> เพิ่มข้อมูลนักเรียน
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6 flex-grow w-full space-y-6" id="exportableDashboardArea">
+
+        <!-- Action Toolbar -->
+        <div class="flex flex-wrap items-center justify-between gap-4 bg-slate-900/60 p-4 rounded-2xl border border-slate-800">
+            <div class="flex items-center gap-2 text-xs text-slate-400">
+                <i class="fa-solid fa-circle-info text-sport-blue"></i>
+                <span>ปรับปรุงข้อมูลล่าสุดเมื่อ: <strong id="lastUpdateText" class="text-slate-200">-</strong></span>
+            </div>
+
+            <div class="flex items-center gap-2 flex-wrap">
+                <label class="px-3 py-1.5 rounded-xl bg-violet-600/20 hover:bg-violet-600/30 text-violet-300 border border-violet-500/30 text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer">
+                    <i class="fa-solid fa-file-import"></i> นำเข้า Excel
+                    <input type="file" id="excelFileInput" accept=".xlsx, .xls, .csv" onchange="importFromExcel(event)" class="hidden">
+                </label>
+                <button onclick="exportToExcel()" class="px-3 py-1.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 text-xs font-semibold flex items-center gap-1.5 transition">
+                    <i class="fa-solid fa-file-excel"></i> ส่งออก Excel
+                </button>
+                <button onclick="exportDashboardImage()" class="px-3 py-1.5 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/30 text-xs font-semibold flex items-center gap-1.5 transition">
+                    <i class="fa-solid fa-image"></i> เซฟรูปภาพ Dashboard
+                </button>
+                <button onclick="seedSampleData()" class="px-3 py-1.5 rounded-xl bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 border border-amber-500/30 text-xs font-semibold flex items-center gap-1.5 transition">
+                    <i class="fa-solid fa-users-gear"></i> สุ่มตัวอย่าง 150+ คน (ทั้งโรงเรียน)
+                </button>
+                <button onclick="clearAllData()" class="px-3 py-1.5 rounded-xl bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 border border-rose-500/30 text-xs font-semibold flex items-center gap-1.5 transition">
+                    <i class="fa-solid fa-trash-can"></i> ล้างข้อมูลทั้งหมด
+                </button>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <!-- Total Students KPI -->
+            <div class="sport-card rounded-2xl p-4 flex items-center justify-between relative overflow-hidden">
+                <div>
+                    <p class="text-xs text-slate-400 font-medium">นักเรียนที่ประเมินทั้งหมด</p>
+                    <h3 class="text-2xl font-bold text-white mt-1" id="kpiTotalStudents">0</h3>
+                    <p class="text-[11px] text-slate-400 mt-0.5" id="kpiGenderRatio">ชาย 0 | หญิง 0</p>
+                </div>
+                <div class="w-12 h-12 rounded-xl bg-blue-500/10 text-blue-400 flex items-center justify-center text-xl border border-blue-500/20">
+                    <i class="fa-solid fa-users"></i>
+                </div>
+            </div>
+
+            <!-- Normal BMI KPI -->
+            <div class="sport-card rounded-2xl p-4 flex flex-col justify-between relative overflow-hidden">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-xs text-emerald-400 font-semibold">สมส่วน (น้ำหนักตามเกณฑ์)</p>
+                        <h3 class="text-2xl font-bold text-emerald-300 mt-1" id="kpiNormalPercent">0%</h3>
+                    </div>
+                    <div class="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center text-lg border border-emerald-500/20">
+                        <i class="fa-solid fa-child-reaching"></i>
+                    </div>
+                </div>
+                <div class="mt-3">
+                    <div class="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
+                        <div id="kpiNormalBar" class="bg-emerald-400 h-1.5 rounded-full" style="width: 0%"></div>
+                    </div>
+                    <span class="text-[10px] text-slate-400 mt-1 block" id="kpiNormalCount">0 คน จากทั้งหมด</span>
+                </div>
+            </div>
+
+            <!-- Overweight KPI -->
+            <div class="sport-card rounded-2xl p-4 flex flex-col justify-between relative overflow-hidden">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-xs text-orange-400 font-semibold">เริ่มอ้วน / อ้วน</p>
+                        <h3 class="text-2xl font-bold text-orange-300 mt-1" id="kpiOverweightCount">0</h3>
+                    </div>
+                    <div class="w-10 h-10 rounded-xl bg-orange-500/10 text-orange-400 flex items-center justify-center text-lg border border-orange-500/20">
+                        <i class="fa-solid fa-weight-scale"></i>
+                    </div>
+                </div>
+                <div class="mt-3">
+                    <div class="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
+                        <div id="kpiOverweightBar" class="bg-orange-400 h-1.5 rounded-full" style="width: 0%"></div>
+                    </div>
+                    <span class="text-[10px] text-slate-400 mt-1 block" id="kpiOverweightPercent">คิดเป็น 0% ของนักเรียน</span>
+                </div>
+            </div>
+
+            <!-- Underweight KPI -->
+            <div class="sport-card rounded-2xl p-4 flex flex-col justify-between relative overflow-hidden">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-xs text-amber-400 font-semibold">ผอม / ต่ำกว่าเกณฑ์</p>
+                        <h3 class="text-2xl font-bold text-amber-300 mt-1" id="kpiUnderweightCount">0</h3>
+                    </div>
+                    <div class="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center text-lg border border-amber-500/20">
+                        <i class="fa-solid fa-person-falling-burst"></i>
+                    </div>
+                </div>
+                <div class="mt-3">
+                    <div class="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
+                        <div id="kpiUnderweightBar" class="bg-amber-400 h-1.5 rounded-full" style="width: 0%"></div>
+                    </div>
+                    <span class="text-[10px] text-slate-400 mt-1 block" id="kpiUnderweightPercent">คิดเป็น 0% ของนักเรียน</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Room Specific Summary Card -->
+        <div id="roomSummaryCard" class="hidden sport-card rounded-2xl p-4 border border-sport-accent/30 bg-gradient-to-r from-slate-900/90 to-slate-900/60">
+            <div class="flex flex-wrap items-center justify-between gap-4">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-sport-accent/20 text-sport-accent flex items-center justify-center text-lg border border-sport-accent/30">
+                        <i class="fa-solid fa-door-open"></i>
+                    </div>
+                    <div>
+                        <h4 class="text-base font-bold text-white flex items-center gap-2" id="roomSummaryTitle">
+                            สรุปสถิติประจำห้องเรียน
+                        </h4>
+                        <p class="text-xs text-slate-400" id="roomSummaryDesc">ข้อมูลจำเพาะเจาะจงกลุ่มเป้าหมาย</p>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-4 text-xs">
+                    <div class="bg-slate-800/80 px-3 py-1.5 rounded-xl border border-slate-700">
+                        <span class="text-slate-400">สมส่วน:</span>
+                        <strong class="text-emerald-400 ml-1" id="roomNormalStat">0 คน (0%)</strong>
+                    </div>
+                    <div class="bg-slate-800/80 px-3 py-1.5 rounded-xl border border-slate-700">
+                        <span class="text-slate-400">เริ่มอ้วน/อ้วน:</span>
+                        <strong class="text-orange-400 ml-1" id="roomOverweightStat">0 คน (0%)</strong>
+                    </div>
+                    <div class="bg-slate-800/80 px-3 py-1.5 rounded-xl border border-slate-700">
+                        <span class="text-slate-400">ผอม:</span>
+                        <strong class="text-amber-400 ml-1" id="roomUnderweightStat">0 คน (0%)</strong>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Doughnut Chart -->
+            <div class="sport-card rounded-2xl p-5 border border-slate-800 flex flex-col">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                        <i class="fa-solid fa-chart-pie text-sport-accent"></i> สัดส่วนภาวะโภชนาการ (BMI)
+                    </h3>
+                </div>
+                <div class="relative w-full h-56 flex-grow flex items-center justify-center">
+                    <canvas id="bmiDoughnutChart"></canvas>
+                </div>
+                <div class="grid grid-cols-2 gap-2 mt-4 pt-3 border-t border-slate-800/60 text-xs text-slate-300">
+                    <div class="flex items-center gap-2"><span class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span> สมส่วน</div>
+                    <div class="flex items-center gap-2"><span class="w-2.5 h-2.5 rounded-full bg-amber-400"></span> ผอม</div>
+                    <div class="flex items-center gap-2"><span class="w-2.5 h-2.5 rounded-full bg-orange-400"></span> เริ่มอ้วน</div>
+                    <div class="flex items-center gap-2"><span class="w-2.5 h-2.5 rounded-full bg-rose-500"></span> อ้วน</div>
+                </div>
+            </div>
+
+            <!-- Bar Chart -->
+            <div class="sport-card rounded-2xl p-5 border border-slate-800 lg:col-span-2 flex flex-col">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                        <i class="fa-solid fa-chart-column text-sport-blue"></i> ค่าเฉลี่ยน้ำหนักและส่วนสูง จำแนกตามระดับชั้น
+                    </h3>
+                </div>
+                <div class="relative w-full h-64 flex-grow">
+                    <canvas id="gradeBarChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="sport-card rounded-2xl p-5 border border-slate-800">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                    <i class="fa-solid fa-venus-mars text-sport-purple"></i> การเปรียบเทียบภาวะโภชนาการ จำแนกตามเพศชาย-หญิง
+                </h3>
+            </div>
+            <div class="relative w-full h-56">
+                <canvas id="genderStackChart"></canvas>
+            </div>
+        </div>
+
+        <div class="sport-card rounded-2xl p-5 border border-slate-800 space-y-4">
+            <div class="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-slate-800">
+                <div>
+                    <h3 class="text-base font-bold text-white flex items-center gap-2">
+                        <i class="fa-solid fa-table text-sport-accent"></i> รายชื่อและการประเมินสุขภาพนักเรียน
+                    </h3>
+                    <p class="text-xs text-slate-400">แสดงผลเฉพาะภาคเรียนที่เลือก ค้นหา กรอง และจัดการข้อมูลได้อย่างรวดเร็ว</p>
+                </div>
+
+                <div class="flex flex-wrap items-center gap-2 w-full md:w-auto">
+                    <div class="relative flex-grow md:flex-grow-0 min-w-[200px]">
+                        <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs"></i>
+                        <input type="text" id="searchInput" oninput="renderTable()" placeholder="ค้นหาชื่อ, รหัสนักเรียน..." class="w-full bg-slate-900 border border-slate-700 rounded-xl pl-8 pr-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-sport-accent">
+                    </div>
+
+                    <select id="gradeFilter" onchange="onGradeFilterChange()" class="bg-slate-900 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-sport-accent">
+                        <option value="ALL">ทุกระดับชั้น</option>
+                        <option value="อนุบาล 1">อนุบาล 1</option>
+                        <option value="อนุบาล 2">อนุบาล 2</option>
+                        <option value="อนุบาล 3">อนุบาล 3</option>
+                        <option value="ประถมศึกษาปีที่ 1">ประถมศึกษาปีที่ 1</option>
+                        <option value="ประถมศึกษาปีที่ 2">ประถมศึกษาปีที่ 2</option>
+                        <option value="ประถมศึกษาปีที่ 3">ประถมศึกษาปีที่ 3</option>
+                        <option value="ประถมศึกษาปีที่ 4">ประถมศึกษาปีที่ 4</option>
+                        <option value="ประถมศึกษาปีที่ 5">ประถมศึกษาปีที่ 5</option>
+                        <option value="ประถมศึกษาปีที่ 6">ประถมศึกษาปีที่ 6</option>
+                        <option value="มัธยมศึกษาปีที่ 1">มัธยมศึกษาปีที่ 1</option>
+                        <option value="มัธยมศึกษาปีที่ 2">มัธยมศึกษาปีที่ 2</option>
+                        <option value="มัธยมศึกษาปีที่ 3">มัธยมศึกษาปีที่ 3</option>
+                        <option value="มัธยมศึกษาปีที่ 4">มัธยมศึกษาปีที่ 4</option>
+                        <option value="มัธยมศึกษาปีที่ 5">มัธยมศึกษาปีที่ 5</option>
+                        <option value="มัธยมศึกษาปีที่ 6">มัธยมศึกษาปีที่ 6</option>
+                    </select>
+
+                    <select id="roomFilter" onchange="renderTable()" class="bg-slate-900 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-sport-accent">
+                        <option value="ALL">ทุกห้องเรียน</option>
+                    </select>
+
+                    <select id="statusFilter" onchange="renderTable()" class="bg-slate-900 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-sport-accent">
+                        <option value="ALL">ทุกสถานะ BMI</option>
+                        <option value="สมส่วน">สมส่วน</option>
+                        <option value="ผอม">ผอม</option>
+                        <option value="เริ่มอ้วน">เริ่มอ้วน</option>
+                        <option value="อ้วน">อ้วน</option>
+                    </select>
+
+                    <button onclick="clearFilters()" class="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white text-xs font-semibold transition" title="ล้างการกรอง">
+                        <i class="fa-solid fa-arrows-rotate"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div class="overflow-x-auto rounded-xl border border-slate-800">
+                <table class="w-full text-left border-collapse text-xs">
+                    <thead>
+                        <tr class="bg-slate-900/90 text-slate-400 uppercase font-semibold border-b border-slate-800">
+                            <th class="p-3.5">รหัส</th>
+                            <th class="p-3.5">ชื่อ - นามสกุล</th>
+                            <th class="p-3.5">เพศ</th>
+                            <th class="p-3.5">ระดับชั้น/ห้อง</th>
+                            <th class="p-3.5 text-center">เลขที่</th>
+                            <th class="p-3.5 text-center">อายุ (ปี)</th>
+                            <th class="p-3.5 text-center">น้ำหนัก (กก.)</th>
+                            <th class="p-3.5 text-center">ส่วนสูง (ซม.)</th>
+                            <th class="p-3.5 text-center">BMI</th>
+                            <th class="p-3.5 text-center">เกณฑ์กรมพลศึกษา</th>
+                            <th class="p-3.5 min-w-[220px]">คำแนะนำการดูแลสุขภาพเฉพาะช่วงวัย</th>
+                            <th class="p-3.5 text-center">จัดการ</th>
+                        </tr>
+                    </thead>
+                    <tbody id="studentTableBody" class="divide-y divide-slate-800/60 text-slate-200">
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="flex items-center justify-between text-xs text-slate-400 pt-2">
+                <span>แสดงข้อมูล <strong id="showingCount" class="text-slate-200">0</strong> รายการ จากภาคเรียนนี้ทั้งหมด <strong id="totalRecordsCount" class="text-slate-200">0</strong> รายการ</span>
+            </div>
+        </div>
+    </main>
+
+    <div id="studentModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md hidden items-center justify-center p-4 z-50 transition-opacity duration-300">
+        <div class="sport-card rounded-2xl w-full max-w-xl p-6 relative border border-slate-700 shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
+            <div class="flex justify-between items-center pb-4 border-b border-slate-800">
+                <h3 id="modalTitle" class="text-lg font-bold text-slate-100 flex items-center gap-2">
+                    <i class="fa-solid fa-user-plus text-sport-accent"></i> กรอกข้อมูลน้ำหนักส่วนสูงนักเรียน
+                </h3>
+                <button onclick="closeModal()" class="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <form id="studentForm" onsubmit="handleFormSubmit(event)" class="space-y-4 overflow-y-auto p-1 mt-4 flex-grow">
+                <input type="hidden" id="editIndex" value="-1">
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">ปีการศึกษา</label>
+                        <select id="formYear" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-sport-accent">
+                            <option value="2568">2568</option>
+                            <option value="2567">2567</option>
+                            <option value="2566">2566</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">ภาคเรียนที่ (เทอม)</label>
+                        <select id="formTerm" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-sport-accent">
+                            <option value="1">1</option>
+                            <option value="2">2</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">รหัสนักเรียน</label>
+                        <input type="text" id="studentId" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-sport-accent" placeholder="เช่น ST-1001">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">เพศ</label>
+                        <select id="gender" required onchange="calculateLiveBMI()" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-sport-accent">
+                            <option value="ชาย">ชาย</option>
+                            <option value="หญิง">หญิง</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">ชื่อจริง</label>
+                        <input type="text" id="firstName" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-sport-accent" placeholder="กรอกชื่อจริง">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">นามสกุล</label>
+                        <input type="text" id="lastName" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-sport-accent" placeholder="กรอกนามสกุล">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-3 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">ระดับชั้น</label>
+                        <select id="grade" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-2.5 py-2 text-xs text-white focus:outline-none focus:border-sport-accent">
+                            <option value="อนุบาล 1">อนุบาล 1</option>
+                            <option value="อนุบาล 2">อนุบาล 2</option>
+                            <option value="อนุบาล 3">อนุบาล 3</option>
+                            <option value="ประถมศึกษาปีที่ 1">ประถมศึกษาปีที่ 1</option>
+                            <option value="ประถมศึกษาปีที่ 2">ประถมศึกษาปีที่ 2</option>
+                            <option value="ประถมศึกษาปีที่ 3">ประถมศึกษาปีที่ 3</option>
+                            <option value="ประถมศึกษาปีที่ 4">ประถมศึกษาปีที่ 4</option>
+                            <option value="ประถมศึกษาปีที่ 5">ประถมศึกษาปีที่ 5</option>
+                            <option value="ประถมศึกษาปีที่ 6">ประถมศึกษาปีที่ 6</option>
+                            <option value="มัธยมศึกษาปีที่ 1">มัธยมศึกษาปีที่ 1</option>
+                            <option value="มัธยมศึกษาปีที่ 2">มัธยมศึกษาปีที่ 2</option>
+                            <option value="มัธยมศึกษาปีที่ 3">มัธยมศึกษาปีที่ 3</option>
+                            <option value="มัธยมศึกษาปีที่ 4">มัธยมศึกษาปีที่ 4</option>
+                            <option value="มัธยมศึกษาปีที่ 5">มัธยมศึกษาปีที่ 5</option>
+                            <option value="มัธยมศึกษาปีที่ 6">มัธยมศึกษาปีที่ 6</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">ห้องที่</label>
+                        <input type="number" id="room" min="1" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-sport-accent" placeholder="เช่น 1">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">เลขที่</label>
+                        <input type="number" id="rollNo" min="1" max="100" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-sport-accent" placeholder="เช่น 5">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-3 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">อายุ (ปี)</label>
+                        <input type="number" id="age" min="3" max="19" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-sport-accent" placeholder="เช่น 10" oninput="calculateLiveBMI()">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">น้ำหนัก (กก.)</label>
+                        <input type="number" step="0.1" id="weight" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-sport-accent" placeholder="เช่น 32.5" oninput="calculateLiveBMI()">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">ส่วนสูง (ซม.)</label>
+                        <input type="number" step="0.1" id="height" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-sport-accent" placeholder="เช่น 138" oninput="calculateLiveBMI()">
+                    </div>
+                </div>
+
+                <div class="bg-slate-900/80 p-3.5 rounded-xl border border-slate-800 space-y-2">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <span class="text-[11px] text-slate-400 block">ผลคำนวณเบื้องต้น (ตามเกณฑ์กรมพลศึกษา)</span>
+                            <span id="liveBmiText" class="text-sm font-mono font-bold text-sport-accent">BMI: 0.0</span>
+                        </div>
+                        <span id="liveStatusBadge" class="px-3 py-1 rounded-full text-xs font-bold bg-slate-800 text-slate-400">
+                            รอระบุข้อมูล
+                        </span>
+                    </div>
+                    <p id="liveAdviceText" class="text-[11px] text-slate-300 italic">กรอกน้ำหนักและส่วนสูงเพื่อประเมินผล</p>
+                </div>
+
+                <div class="pt-2 flex justify-end gap-2">
+                    <button type="button" onclick="closeModal()" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition">
+                        ยกเลิก
+                    </button>
+                    <button type="submit" class="px-5 py-2 rounded-xl bg-gradient-to-r from-sport-accent to-emerald-400 hover:from-emerald-400 hover:to-sport-accent text-slate-950 font-bold text-xs shadow-lg transition">
+                        บันทึกข้อมูล
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="historyModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md hidden items-center justify-center p-4 z-50 transition-opacity duration-300">
+        <div class="sport-card rounded-2xl w-full max-w-4xl p-6 relative border border-slate-700 shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
+            <div class="flex justify-between items-center pb-4 border-b border-slate-800">
+                <div>
+                    <h3 class="text-xl font-bold text-slate-100 flex items-center gap-2">
+                        <i class="fa-solid fa-chart-line text-sport-purple"></i> สรุปและเปรียบเทียบสถิติมวลรวมรายเทอม / รายปี
+                    </h3>
+                    <p class="text-xs text-slate-400">เปรียบเทียบพัฒนาการทางร่างกายและภาวะโภชนาการย้อนหลังแต่ละภาคเรียน</p>
+                </div>
+                <button onclick="closeHistoryModal()" class="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <div class="overflow-y-auto p-1 space-y-6 mt-4 flex-grow">
+                <div class="bg-slate-900/80 p-4 rounded-xl border border-slate-800">
+                    <h4 class="text-sm font-bold text-slate-200 mb-3 flex items-center gap-2">
+                        <i class="fa-solid fa-arrow-trend-up text-sport-accent"></i>แนวโน้มสัดส่วนนักเรียนสมส่วนย้อนหลังรายเทอม
+                    </h4>
+                    <div class="relative w-full h-60">
+                        <canvas id="historyLineChart"></canvas>
+                    </div>
+                </div>
+
+                <div>
+                    <h4 class="text-sm font-bold text-slate-200 mb-3 flex items-center gap-2">
+                        <i class="fa-solid fa-table-list text-sport-blue"></i>ตารางสรุปสถิติจำแนกรายปีการศึกษาและภาคเรียน
+                    </h4>
+                    <div class="overflow-x-auto rounded-xl border border-slate-800">
+                        <table class="w-full text-left border-collapse text-xs">
+                            <thead>
+                                <tr class="bg-slate-900 text-slate-300 uppercase font-semibold border-b border-slate-800">
+                                    <th class="p-3">ปีการศึกษา / เทอม</th>
+                                    <th class="p-3 text-center">นักเรียนทั้งหมด</th>
+                                    <th class="p-3 text-center text-emerald-400">สมส่วน (คน)</th>
+                                    <th class="p-3 text-center text-emerald-400">สมส่วน (%)</th>
+                                    <th class="p-3 text-center text-orange-400">เริ่มอ้วน/อ้วน (คน)</th>
+                                    <th class="p-3 text-center text-amber-400">ผอม (คน)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="historyTableBody" class="divide-y divide-slate-800 text-slate-200">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pt-4 border-t border-slate-800 flex justify-end">
+                <button onclick="closeHistoryModal()" class="px-5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm font-bold transition">
+                    ปิดหน้าต่าง
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification Container -->
+    <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+    <script>
+        let students = [];
+        let bmiDoughnutChartInstance = null;
+        let gradeBarChartInstance = null;
+        let genderStackChartInstance = null;
+        let historyLineChartInstance = null;
+
+        const LOCAL_STORAGE_KEY = 'SPORT_HEALTH_STUDENT_DATA_V3';
+
+        const OFFICIAL_THAI_BMI_STANDARDS = {
+            3:  { male: [13.8, 16.5, 17.8], female: [13.5, 16.2, 17.5] },
+            4:  { male: [13.6, 16.3, 17.6], female: [13.3, 16.0, 17.4] },
+            5:  { male: [13.5, 16.2, 17.8], female: [13.2, 16.0, 17.6] },
+            6:  { male: [13.5, 16.5, 18.2], female: [13.1, 16.3, 18.2] },
+            7:  { male: [13.6, 17.0, 19.1], female: [13.1, 16.8, 19.0] },
+            8:  { male: [13.8, 17.6, 20.1], female: [13.2, 17.5, 20.0] },
+            9:  { male: [14.0, 18.3, 21.2], female: [13.4, 18.3, 21.1] },
+            10: { male: [14.2, 19.1, 22.4], female: [13.7, 19.2, 22.3] },
+            11: { male: [14.5, 20.0, 23.6], female: [14.1, 20.2, 23.6] },
+            12: { male: [15.0, 21.0, 24.8], female: [14.6, 21.3, 24.8] },
+            13: { male: [15.5, 21.9, 25.8], female: [15.2, 22.3, 25.8] },
+            14: { male: [16.1, 22.7, 26.7], female: [15.8, 23.1, 26.6] },
+            15: { male: [16.7, 23.4, 27.4], female: [16.3, 23.7, 27.2] },
+            16: { male: [17.3, 24.1, 27.9], female: [16.7, 24.1, 27.6] },
+            17: { male: [17.8, 24.6, 28.3], female: [17.0, 24.4, 27.9] },
+            18: { male: [18.2, 25.0, 28.6], female: [17.2, 24.6, 28.1] },
+            19: { male: [18.5, 25.0, 28.8], female: [17.4, 24.7, 28.3] }
+        };
+
+        function saveToLocalStorage() {
+            try {
+                localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(students));
+            } catch (e) {
+                console.error("Local storage error", e);
+            }
+        }
+
+        function loadFromLocalStorage() {
+            try {
+                const data = localStorage.getItem(LOCAL_STORAGE_KEY);
+                if (data) {
+                    students = JSON.parse(data);
+                } else {
+                    students = [];
+                }
+            } catch (e) {
+                console.error("Failed to parse local storage data", e);
+                students = [];
+            }
+        }
+
+        function updateLastUpdateDate() {
+            const today = new Date();
+            const dateStr = today.toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric' });
+            const elem = document.getElementById('lastUpdateText');
+            if (elem) elem.innerText = dateStr;
+        }
+
+        function getActivePeriod() {
+            const yearElem = document.getElementById('selectedYear');
+            const termElem = document.getElementById('selectedTerm');
+            return {
+                year: yearElem ? yearElem.value : '2568',
+                term: termElem ? termElem.value : '1'
+            };
+        }
+
+        function onPeriodChange() {
+            populateRoomFilter();
+            refreshDashboard();
+        }
+
+        function getFilteredPeriodStudents() {
+            const period = getActivePeriod();
+            return students.filter(s => (s.year || '2568') === period.year && (s.term || '1') === period.term);
+        }
+
+        function getAgeGroupAdvice(status, ageYears) {
+            const age = parseInt(ageYears) || 10;
+
+            // 1. Early Childhood (3 - 5 Years) / Kindergarten
+            if (age <= 5) {
+                switch(status) {
+                    case 'ผอม':
+                        return '🍼 วัยปฐมวัย (3-5 ขวบ): เน้นอาหารจานโปรดเพิ่มไขมันดีและโปรตีน เช่น ต้มจืดหมูสับ ไข่ตุ๋น ดื่มจิบรสจืดวันละ 3-4 แก้ว พักผ่อน 10-12 ชม./วัน';
+                    case 'สมส่วน':
+                        return '✅ วัยปฐมวัย (3-5 ขวบ): สุขภาพดีสมส่วน ดื่มนมรสจืด 2-3 แก้ว/วัน วิ่งเล่นอิสระ พัฒนากล้ามเนื้อมัดใหญ่ เช่น วิ่ง เต้น และนอนเต็มอิ่ม 10-12 ชม.';
+                    case 'เริ่มอ้วน':
+                        return '🎈 วัยปฐมวัย (3-5 ขวบ): ปรับเลี่ยงขนมกรุบกรอบ น้ำหวาน ดื่มนมจืดรสปกติ ชวนวิ่งเล่นสนามเด็กเล่น เลื่อนหรือลดเวลามองหน้าจอ (Screen time) ไม่เกิน 1 ชม.';
+                    case 'อ้วน':
+                        return '🧸 วัยปฐมวัย (3-5 ขวบ): งดนมรสหวาน/น้ำอัดลมอย่างเด็ดขาด เพิ่มผลไม้สดไม่หวานจัดแทนขนม เน้นกิจกรรมเคลื่อนไหวร่างกายประกอบเพลง ชวนเดินเล่นวันละ 45 นาที';
+                    default:
+                        return '';
+                }
+            }
+            // 2. Primary School Age (6 - 12 Years)
+            else if (age <= 12) {
+                switch(status) {
+                    case 'ผอม':
+                        return '🥩 วัยประถม (6-12 ปี): เพิ่มอาหารพลังงานและแคลเซียม เช่น นมรสจืด 2-3 แก้ว, ปลา, ไข่ต้ม 2 ฟอง/วัน เล่นกีฬาสร้างมวลกล้ามเนื้อ พักผ่อน 9-11 ชม.';
+                    case 'สมส่วน':
+                        return '✅ วัยประถม (6-12 ปี): รับประทานอาหารครบ 5 หมู่ ดื่มนมรสจืด 2 แก้ว ออกกำลังกายปานกลาง-หนัก เช่น ปั่นจักรยาน ว่ายน้ำ หรือวิ่ง เล่นกีฬา 60 นาที/วัน';
+                    case 'เริ่มอ้วน':
+                        return '🥗 วัยประถม (6-12 ปี): ลดอาหารทอด/ผัดน้ำมันมาก ขนมหวาน น้ำหวาน เพิ่มผักในมื้ออาหาร ออกกำลังกายสะสมวันละ 60 นาที เข้านอนก่อน 21.00 น.';
+                    case 'อ้วน':
+                        return '🏃 วัยประถม (6-12 ปี): ปรับพฤติกรรมด่วน งดน้ำหวาน/น้ำอัดลม/ขนมกรอบ เพิ่มการกินผักสด/ต้ม เน้นออกกำลังกายประเภทแอโรบิกต่อเนื่อง 45-60 นาที จำกัดหน้าจอไม่เกิน 1-2 ชม.';
+                    default:
+                        return '';
+                }
+            }
+            // 3. Secondary & Adolescence (13 - 19 Years)
+            else {
+                switch(status) {
+                    case 'ผอม':
+                        return '💪 วัยมัธยม (13-19 ปี): เสริมการสร้างมวลกล้ามเนื้อด้วยการเวทเทรนนิ่ง/บอดี้เวท ร่วมกับการรับประทานโปรตีนคุณภาพดี คาร์โบไฮเดรตเชิงซ้อน และพักผ่อน 8-10 ชม.';
+                    case 'สมส่วน':
+                        return '✅ วัยมัธยม (13-19 ปี): รักษาสมดุลโภชนาการ เน้นทานโปรตีน ธาตุเหล็ก และแคลเซียมให้เพียงพอ เล่นกีฬาต่อเนื่องสม่ำเสมอสัปดาห์ละอย่างน้อย 150 นาที';
+                    case 'เริ่มอ้วน':
+                        return '🚴 วัยมัธยม (13-19 ปี): เลี่ยงชานมไข่มุก น้ำหวาน อาหารฟาสต์ฟู้ด คุมแคลอรี เพิ่มกิจกรรมทางกาย การออกกำลังกายแอโรบิก และงดมื้อดึก';
+                    case 'อ้วน':
+                        return '🔥 วัยมัธยม (13-19 ปี): คุมอาหารอย่างจริงจัง ปรับเปลี่ยนไลฟ์สไตล์ งดน้ำหวานและของทอด ทำ Cardio + Resistance Training อย่างน้อย 5 วัน/สัปดาห์ งดเล่นมือถือก่อนนอน';
+                    default:
+                        return '';
+                }
+            }
+        }
+
+        function calculateBMIInfo(weightKg, heightCm, ageYears, gender) {
+            const hM = heightCm / 100;
+            if (!hM || hM <= 0 || !weightKg || weightKg <= 0) {
+                return { 
+                    bmi: '0.0', 
+                    status: 'รอระบุข้อมูล', 
+                    colorClass: 'bg-slate-800 text-slate-400 border border-slate-700', 
+                    advice: 'กรอกข้อมูลน้ำหนักส่วนสูงให้ครบถ้วนเพื่อประเมินผล' 
+                };
+            }
+
+            const bmiVal = (weightKg / (hM * hM));
+            const bmiFormatted = bmiVal.toFixed(1);
+
+            const effectiveAge = Math.min(Math.max(parseInt(ageYears) || 10, 3), 19);
+            const isMale = (gender === 'ชาย');
+            const std = OFFICIAL_THAI_BMI_STANDARDS[effectiveAge] ? 
+                          (isMale ? OFFICIAL_THAI_BMI_STANDARDS[effectiveAge].male : OFFICIAL_THAI_BMI_STANDARDS[effectiveAge].female)
+                          : (isMale ? [18.5, 22.9, 27.5] : [18.5, 22.9, 27.5]);
+
+            let status = 'สมส่วน';
+            let colorClass = 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30';
+
+            if (bmiVal < std[0]) {
+                status = 'ผอม';
+                colorClass = 'bg-amber-500/20 text-amber-400 border border-amber-500/30';
+            } else if (bmiVal >= std[0] && bmiVal <= std[1]) {
+                status = 'สมส่วน';
+                colorClass = 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30';
+            } else if (bmiVal > std[1] && bmiVal <= std[2]) {
+                status = 'เริ่มอ้วน';
+                colorClass = 'bg-orange-500/20 text-orange-400 border border-orange-500/30';
+            } else {
+                status = 'อ้วน';
+                colorClass = 'bg-rose-500/20 text-rose-400 border border-rose-500/30';
+            }
+
+            const advice = getAgeGroupAdvice(status, effectiveAge);
+
+            return { bmi: bmiFormatted, status, colorClass, advice };
+        }
+
+        function renderKPIs() {
+            const activeStudents = getFilteredPeriodStudents();
+            const total = activeStudents.length;
+
+            let males = 0, females = 0;
+            let normalCount = 0, overweightCount = 0, underweightCount = 0;
+
+            activeStudents.forEach(s => {
+                if (s.gender === 'ชาย') males++;
+                else if (s.gender === 'หญิง') females++;
+
+                const info = calculateBMIInfo(s.weight, s.height, s.age, s.gender);
+                if (info.status === 'สมส่วน') normalCount++;
+                else if (info.status === 'เริ่มอ้วน' || info.status === 'อ้วน') overweightCount++;
+                else if (info.status === 'ผอม') underweightCount++;
+            });
+
+            const normalPct = total > 0 ? ((normalCount / total) * 100).toFixed(1) : '0';
+            const overweightPct = total > 0 ? ((overweightCount / total) * 100).toFixed(1) : '0';
+            const underweightPct = total > 0 ? ((underweightCount / total) * 100).toFixed(1) : '0';
+
+            const elemTotal = document.getElementById('kpiTotalStudents');
+            if (elemTotal) elemTotal.innerText = total;
+
+            const elemRatio = document.getElementById('kpiGenderRatio');
+            if (elemRatio) elemRatio.innerText = `ชาย ${males} | หญิง ${females}`;
+
+            const elemNormalPct = document.getElementById('kpiNormalPercent');
+            if (elemNormalPct) elemNormalPct.innerText = `${normalPct}%`;
+
+            const elemNormalBar = document.getElementById('kpiNormalBar');
+            if (elemNormalBar) elemNormalBar.style.width = `${normalPct}%`;
+
+            const elemNormalCount = document.getElementById('kpiNormalCount');
+            if (elemNormalCount) elemNormalCount.innerText = `${normalCount} คน จากทั้งหมด`;
+
+            const elemOverCount = document.getElementById('kpiOverweightCount');
+            if (elemOverCount) elemOverCount.innerText = overweightCount;
+
+            const elemOverBar = document.getElementById('kpiOverweightBar');
+            if (elemOverBar) elemOverBar.style.width = `${overweightPct}%`;
+
+            const elemOverPct = document.getElementById('kpiOverweightPercent');
+            if (elemOverPct) elemOverPct.innerText = `คิดเป็น ${overweightPct}% ของนักเรียน`;
+
+            const elemUnderCount = document.getElementById('kpiUnderweightCount');
+            if (elemUnderCount) elemUnderCount.innerText = underweightCount;
+
+            const elemUnderBar = document.getElementById('kpiUnderweightBar');
+            if (elemUnderBar) elemUnderBar.style.width = `${underweightPct}%`;
+
+            const elemUnderPct = document.getElementById('kpiUnderweightPercent');
+            if (elemUnderPct) elemUnderPct.innerText = `คิดเป็น ${underweightPct}% ของนักเรียน`;
+        }
+
+        function populateRoomFilter() {
+            const gradeFilter = document.getElementById('gradeFilter').value;
+            const roomFilter = document.getElementById('roomFilter');
+            if (!roomFilter) return;
+
+            const currentVal = roomFilter.value;
+            const activeStudents = getFilteredPeriodStudents();
+
+            let rooms = new Set();
+            activeStudents.forEach(s => {
+                if (gradeFilter === 'ALL' || s.grade === gradeFilter) {
+                    if (s.room) rooms.add(String(s.room));
+                }
+            });
+
+            const sortedRooms = Array.from(rooms).sort((a, b) => parseInt(a) - parseInt(b));
+
+            roomFilter.innerHTML = '<option value="ALL">ทุกห้องเรียน</option>';
+            sortedRooms.forEach(r => {
+                const opt = document.createElement('option');
+                opt.value = r;
+                opt.innerText = `ห้อง ${r}`;
+                roomFilter.appendChild(opt);
+            });
+
+            if (sortedRooms.includes(currentVal)) {
+                roomFilter.value = currentVal;
+            } else {
+                roomFilter.value = 'ALL';
+            }
+        }
+
+        function onGradeFilterChange() {
+            populateRoomFilter();
+            renderTable();
+        }
+
+        function renderRoomSummaryCard(filteredList, gradeFilter, roomFilter) {
+            const card = document.getElementById('roomSummaryCard');
+            if (!card) return;
+
+            if (gradeFilter === 'ALL' && roomFilter === 'ALL') {
+                card.classList.add('hidden');
+                return;
+            }
+
+            card.classList.remove('hidden');
+
+            const titleElem = document.getElementById('roomSummaryTitle');
+            const descElem = document.getElementById('roomSummaryDesc');
+
+            let gradeTitle = gradeFilter === 'ALL' ? 'ทุกระดับชั้น' : gradeFilter;
+            let roomTitle = roomFilter === 'ALL' ? 'ทุกห้อง' : `ห้อง ${roomFilter}`;
+
+            if (titleElem) titleElem.innerText = `สรุปสถิติประจำ ${gradeTitle} (${roomTitle})`;
+            if (descElem) descElem.innerText = `ประเมินผลเฉพาะกลุ่มเป้าหมายนักเรียนจำนวน ${filteredList.length} คน`;
+
+            let normal = 0, overweight = 0, underweight = 0;
+            filteredList.forEach(s => {
+                const info = calculateBMIInfo(s.weight, s.height, s.age, s.gender);
+                if (info.status === 'สมส่วน') normal++;
+                else if (info.status === 'เริ่มอ้วน' || info.status === 'อ้วน') overweight++;
+                else if (info.status === 'ผอม') underweight++;
+            });
+
+            const total = filteredList.length;
+            const nPct = total > 0 ? ((normal / total) * 100).toFixed(1) : 0;
+            const oPct = total > 0 ? ((overweight / total) * 100).toFixed(1) : 0;
+            const uPct = total > 0 ? ((underweight / total) * 100).toFixed(1) : 0;
+
+            const nStat = document.getElementById('roomNormalStat');
+            if (nStat) nStat.innerText = `${normal} คน (${nPct}%)`;
+
+            const oStat = document.getElementById('roomOverweightStat');
+            if (oStat) oStat.innerText = `${overweight} คน (${oPct}%)`;
+
+            const uStat = document.getElementById('roomUnderweightStat');
+            if (uStat) uStat.innerText = `${underweight} คน (${uPct}%)`;
+        }
+
+        function calculateLiveBMI() {
+            const age = document.getElementById('age').value;
+            const weight = document.getElementById('weight').value;
+            const height = document.getElementById('height').value;
+            const gender = document.getElementById('gender').value;
+
+            const info = calculateBMIInfo(weight, height, age, gender);
+
+            const bmiText = document.getElementById('liveBmiText');
+            if (bmiText) bmiText.innerText = `BMI: ${info.bmi}`;
+
+            const badge = document.getElementById('liveStatusBadge');
+            if (badge) {
+                badge.innerText = info.status;
+                badge.className = `px-3 py-1 rounded-full text-xs font-bold ${info.colorClass}`;
+            }
+
+            const adviceText = document.getElementById('liveAdviceText');
+            if (adviceText) adviceText.innerText = info.advice;
+        }
+
+        function seedSampleData() {
+            const grades = [
+                { name: 'อนุบาล 1', age: 3 },
+                { name: 'อนุบาล 2', age: 4 },
+                { name: 'อนุบาล 3', age: 5 },
+                { name: 'ประถมศึกษาปีที่ 1', age: 6 },
+                { name: 'ประถมศึกษาปีที่ 2', age: 7 },
+                { name: 'ประถมศึกษาปีที่ 3', age: 8 },
+                { name: 'ประถมศึกษาปีที่ 4', age: 9 },
+                { name: 'ประถมศึกษาปีที่ 5', age: 10 },
+                { name: 'ประถมศึกษาปีที่ 6', age: 11 },
+                { name: 'มัธยมศึกษาปีที่ 1', age: 12 },
+                { name: 'มัธยมศึกษาปีที่ 2', age: 13 },
+                { name: 'มัธยมศึกษาปีที่ 3', age: 14 },
+                { name: 'มัธยมศึกษาปีที่ 4', age: 15 },
+                { name: 'มัธยมศึกษาปีที่ 5', age: 16 },
+                { name: 'มัธยมศึกษาปีที่ 6', age: 17 }
+            ];
+
+            const maleNames = ['ชินดนัย', 'กิตติศักดิ์', 'พงศกร', 'นพรัตน์', 'ธีรภัทร', 'ปณิธาน', 'ศุภโชค', 'ณัฐวุฒิ', 'พีรพล', 'ธนกฤต', 'ก้องภพ', 'ชยพล', 'ธนวัต', 'ปุญญพัฒน์', 'ภานุวัฒน์', 'วรโชติ', 'อภิสิทธิ์', 'จิรวัฒน์', 'กฤษดา', 'จักรพรรดิ'];
+            const femaleNames = ['พิมพ์มาดา', 'ณิชาภัทร', 'กัญญาณัฐ', 'อนันตญา', 'ศิริพร', 'พิชญ์สินี', 'ธนพร', 'วรัญญา', 'สุชานาถ', 'ชลธิชา', 'กานต์ธิดา', 'เบญจวรรณ', 'ปาณิสรา', 'พิชชาภา', 'ศิรินทิพย์', 'อารียา', 'สุพิชชา', 'ณัฐมน', 'พรนภา', 'กัญญารัตน์'];
+            const surnames = ['สุขเสริฐ', 'เจริญผล', 'มั่นคง', 'ทองแท้', 'พัฒนา', 'วงษ์สุวรรณ', 'ยอดเยี่ยม', 'คงกระพัน', 'รัตนโชติ', 'ศิริวัฒน์', 'ตั้งเจริญ', 'ศรีสุข', 'ชัยมงคล', 'ประเสริฐ', 'เกิดผล', 'โชคอำนวย', 'บุญส่ง', 'จิตรตรง', 'อินทร์แก้ว', 'สว่างศรี'];
+
+            let newStudents = [];
+            let idCounter = 1001;
+
+            ['2568', '2567', '2566'].forEach(yr => {
+                ['1', '2'].forEach(tm => {
+                    grades.forEach(gInfo => {
+                        for (let room = 1; room <= 2; room++) {
+                            const studentCount = (yr === '2568' && tm === '1') ? 5 : 2;
+                            for (let i = 0; i < studentCount; i++) {
+                                const isMale = Math.random() > 0.5;
+                                const gender = isMale ? 'ชาย' : 'หญิง';
+                                const firstName = isMale ? maleNames[Math.floor(Math.random() * maleNames.length)] : femaleNames[Math.floor(Math.random() * femaleNames.length)];
+                                const lastName = surnames[Math.floor(Math.random() * surnames.length)];
+
+                                const baseH = 88 + (gInfo.age * 5.2) + Math.floor(Math.random() * 10 - 5);
+                                const baseW = 12.5 + (gInfo.age * 3.1) + (Math.random() * 12 - 4);
+
+                                newStudents.push({
+                                    studentId: `ST-${idCounter++}`,
+                                    firstName: firstName,
+                                    lastName: lastName,
+                                    gender: gender,
+                                    grade: gInfo.name,
+                                    year: yr,
+                                    term: tm,
+                                    room: room,
+                                    rollNo: i + 1,
+                                    age: gInfo.age,
+                                    weight: parseFloat(baseW.toFixed(1)),
+                                    height: parseFloat(baseH.toFixed(1))
+                                });
+                            }
+                        }
+                    });
+                });
+            });
+
+            students = newStudents;
+            saveToLocalStorage();
+            updateLastUpdateDate();
+            refreshDashboard();
+            const currentSemCount = getFilteredPeriodStudents().length;
+            showToast(`จำลองข้อมูลเด็กทั้งโรงเรียนเรียบร้อย! (รวม ${currentSemCount} คน ในภาคเรียนนี้)`, 'success');
+        }
+
+        function importFromExcel(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                try {
+                    const data = new Uint8Array(evt.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const firstSheetName = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[firstSheetName];
+                    const json = XLSX.utils.sheet_to_json(worksheet);
+
+                    if (!json || json.length === 0) {
+                        showToast('ไม่พบข้อมูลในไฟล์ Excel ที่เลือก', 'warning');
+                        return;
+                    }
+
+                    const importedRecords = [];
+                    let importedCount = 0;
+
+                    json.forEach((row, idx) => {
+                        const studentId = row['รหัสนักเรียน'] || row['studentId'] || `ST-IMP-${idx + 1}`;
+                        const nameParts = (row['ชื่อ-นามสกุล'] || row['name'] || '').trim().split(' ');
+                        const firstName = row['ชื่อจริง'] || row['firstName'] || nameParts[0] || `นักเรียน`;
+                        const lastName = row['นามสกุล'] || row['lastName'] || nameParts.slice(1).join(' ') || `ทดสอบ`;
+                        const gender = row['เพศ'] || row['gender'] || 'ชาย';
+                        const grade = row['ระดับชั้น'] || row['grade'] || 'ประถมศึกษาปีที่ 1';
+                        const year = String(row['ปีการศึกษา'] || row['year'] || document.getElementById('selectedYear').value);
+                        const term = String(row['ภาคเรียน'] || row['term'] || document.getElementById('selectedTerm').value);
+                        const room = parseInt(row['ห้อง'] || row['room'] || 1);
+                        const rollNo = parseInt(row['เลขที่'] || row['rollNo'] || idx + 1);
+                        const age = parseInt(row['อายุ'] || row['age'] || 10);
+                        const weight = parseFloat(row['น้ำหนัก'] || row['weight'] || 30);
+                        const height = parseFloat(row['ส่วนสูง'] || row['height'] || 135);
+
+                        importedRecords.push({
+                            studentId, firstName, lastName, gender, grade, year, term, room, rollNo, age, weight, height
+                        });
+                        importedCount++;
+                    });
+
+                    students = [...students, ...importedRecords];
+                    saveToLocalStorage();
+                    updateLastUpdateDate();
+                    refreshDashboard();
+                    showToast(`นำเข้าข้อมูลจาก Excel สำเร็จแล้วจำนวน ${importedCount} รายการ!`, 'success');
+
+                } catch (err) {
+                    console.error("Excel Import Error:", err);
+                    showToast('เกิดข้อผิดพลาดในการอ่านไฟล์ Excel กรุณาตรวจสอบฟอร์แมตไฟล์', 'warning');
+                }
+                e.target.value = '';
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        function renderTable() {
+            const searchInput = document.getElementById('searchInput');
+            const search = searchInput ? searchInput.value.toLowerCase().trim() : '';
+            const gradeFilter = document.getElementById('gradeFilter').value;
+            const roomFilter = document.getElementById('roomFilter').value;
+            const statusFilter = document.getElementById('statusFilter').value;
+
+            const tbody = document.getElementById('studentTableBody');
+            if (!tbody) return;
+            tbody.innerHTML = '';
+
+            const periodStudents = getFilteredPeriodStudents();
+
+            let filtered = periodStudents.filter(s => {
+                const info = calculateBMIInfo(s.weight, s.height, s.age, s.gender);
+                const fullName = `${s.firstName} ${s.lastName}`.toLowerCase();
+                const matchesSearch = s.studentId.toLowerCase().includes(search) || fullName.includes(search);
+                const matchesGrade = gradeFilter === 'ALL' || s.grade === gradeFilter;
+                const matchesRoom = roomFilter === 'ALL' || String(s.room) === String(roomFilter);
+                const matchesStatus = statusFilter === 'ALL' || info.status === statusFilter;
+
+                return matchesSearch && matchesGrade && matchesRoom && matchesStatus;
+            });
+
+            renderRoomSummaryCard(filtered, gradeFilter, roomFilter);
+
+            const showingElem = document.getElementById('showingCount');
+            if (showingElem) showingElem.innerText = filtered.length;
+
+            const totalRecordsElem = document.getElementById('totalRecordsCount');
+            if (totalRecordsElem) totalRecordsElem.innerText = periodStudents.length;
+
+            if (filtered.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="12" class="text-center py-8 text-slate-500">
+                            <i class="fa-solid fa-folder-open text-3xl mb-2 block text-slate-600"></i>
+                            ไม่พบข้อมูลนักเรียนที่ตรงกับเงื่อนไขการค้นหาในภาคเรียนนี้
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            filtered.forEach((s) => {
+                const originalIndex = students.indexOf(s);
+                const info = calculateBMIInfo(s.weight, s.height, s.age, s.gender);
+
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-800/40 transition duration-150";
+
+                const shortGrade = s.grade
+                    .replace('อนุบาล ', 'อ.')
+                    .replace('ประถมศึกษาปีที่ ', 'ป.')
+                    .replace('มัธยมศึกษาปีที่ ', 'ม.');
+
+                tr.innerHTML = `
+                    <td class="p-3.5 font-mono text-xs text-sport-accent font-semibold">${s.studentId}</td>
+                    <td class="p-3.5 font-medium text-slate-100">${s.firstName} ${s.lastName}</td>
+                    <td class="p-3.5">
+                        <span class="px-2 py-0.5 rounded-full text-xs ${s.gender === 'ชาย' ? 'bg-blue-500/10 text-blue-400' : 'bg-pink-500/10 text-pink-400'}">
+                            ${s.gender}
+                        </span>
+                    </td>
+                    <td class="p-3.5 text-xs text-slate-300 font-semibold">${shortGrade} / ห้อง ${s.room}</td>
+                    <td class="p-3.5 text-center font-bold text-sport-yellow text-xs">${s.rollNo || '-'}</td>
+                    <td class="p-3.5 text-center font-semibold text-slate-300">${s.age}</td>
+                    <td class="p-3.5 text-center font-bold text-slate-100">${s.weight}</td>
+                    <td class="p-3.5 text-center font-bold text-slate-100">${s.height}</td>
+                    <td class="p-3.5 text-center font-mono font-bold text-sport-blue">${info.bmi}</td>
+                    <td class="p-3.5 text-center">
+                        <span class="px-2.5 py-1 rounded-full text-xs font-bold ${info.colorClass}">
+                            ${info.status}
+                        </span>
+                    </td>
+                    <td class="p-3.5 text-xs text-slate-300 leading-relaxed max-w-[250px]">
+                        ${info.advice}
+                    </td>
+                    <td class="p-3.5 text-center">
+                        <div class="flex items-center justify-center gap-1">
+                            <button onclick="openEditModal(${originalIndex})" class="w-7 h-7 rounded-lg bg-slate-800 hover:bg-slate-700 text-sport-accent flex items-center justify-center transition" title="แก้ไข">
+                                <i class="fa-solid fa-pen-to-square text-xs"></i>
+                            </button>
+                            <button onclick="deleteStudent(${originalIndex})" class="w-7 h-7 rounded-lg bg-slate-800 hover:bg-slate-700 text-rose-400 flex items-center justify-center transition" title="ลบ">
+                                <i class="fa-solid fa-trash text-xs"></i>
+                            </button>
+                        </div>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function clearFilters() {
+            document.getElementById('searchInput').value = '';
+            document.getElementById('gradeFilter').value = 'ALL';
+            document.getElementById('statusFilter').value = 'ALL';
+            populateRoomFilter();
+            renderTable();
+        }
+
+        function refreshDashboard() {
+            renderKPIs();
+            renderCharts();
+            populateRoomFilter();
+            renderTable();
+        }
+
+        function openAddModal() {
+            document.getElementById('editIndex').value = "-1";
+            document.getElementById('studentForm').reset();
+            document.getElementById('modalTitle').innerHTML = '<i class="fa-solid fa-user-plus text-sport-accent"></i> กรอกข้อมูลน้ำหนักส่วนสูงนักเรียน';
+            
+            const period = getActivePeriod();
+            document.getElementById('formYear').value = period.year;
+            document.getElementById('formTerm').value = period.term;
+            document.getElementById('studentId').value = `ST-${1000 + students.length + 1}`;
+            calculateLiveBMI();
+
+            const modal = document.getElementById('studentModal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function openEditModal(index) {
+            const s = students[index];
+            if (!s) return;
+
+            document.getElementById('editIndex').value = index;
+            document.getElementById('studentId').value = s.studentId;
+            document.getElementById('gender').value = s.gender;
+            document.getElementById('firstName').value = s.firstName;
+            document.getElementById('lastName').value = s.lastName;
+            document.getElementById('grade').value = s.grade;
+            document.getElementById('formYear').value = s.year || '2568';
+            document.getElementById('formTerm').value = s.term || '1';
+            document.getElementById('room').value = s.room;
+            document.getElementById('rollNo').value = s.rollNo || 1;
+            document.getElementById('age').value = s.age;
+            document.getElementById('weight').value = s.weight;
+            document.getElementById('height').value = s.height;
+
+            document.getElementById('modalTitle').innerHTML = '<i class="fa-solid fa-user-pen text-sport-blue"></i> แก้ไขข้อมูลนักเรียน';
+            calculateLiveBMI();
+
+            const modal = document.getElementById('studentModal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('studentModal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        function handleFormSubmit(e) {
+            e.preventDefault();
+
+            const editIndex = parseInt(document.getElementById('editIndex').value);
+            const studentId = document.getElementById('studentId').value.trim();
+            const gender = document.getElementById('gender').value;
+            const firstName = document.getElementById('firstName').value.trim();
+            const lastName = document.getElementById('lastName').value.trim();
+            const grade = document.getElementById('grade').value;
+            const year = document.getElementById('formYear').value;
+            const term = document.getElementById('formTerm').value;
+            const room = parseInt(document.getElementById('room').value);
+            const rollNo = parseInt(document.getElementById('rollNo').value);
+            const age = parseInt(document.getElementById('age').value);
+            const weight = parseFloat(document.getElementById('weight').value);
+            const height = parseFloat(document.getElementById('height').value);
+
+            const record = { studentId, firstName, lastName, gender, grade, year, term, room, rollNo, age, weight, height };
+
+            if (editIndex >= 0 && editIndex < students.length) {
+                students[editIndex] = record;
+                showToast('อัปเดตข้อมูลนักเรียนเรียบร้อยแล้ว', 'success');
+            } else {
+                students.push(record);
+                showToast('เพิ่มนักเรียนใหม่เรียบร้อยแล้ว', 'success');
+            }
+
+            saveToLocalStorage();
+            closeModal();
+            updateLastUpdateDate();
+            refreshDashboard();
+        }
+
+        function deleteStudent(index) {
+            const s = students[index];
+            if (!s) return;
+
+            confirmModal(`ต้องการลบข้อมูลนักเรียนคุณ "${s.firstName} ${s.lastName}" ใช่หรือไม่?`, () => {
+                students.splice(index, 1);
+                saveToLocalStorage();
+                updateLastUpdateDate();
+                refreshDashboard();
+                showToast('ลบข้อมูลเรียบร้อยแล้ว', 'info');
+            });
+        }
+
+        function clearAllData() {
+            confirmModal('คุณแน่ใจหรือไม่ว่าต้องการลบข้อมูลนักเรียนทั้งหมดในระบบ?', () => {
+                students = [];
+                saveToLocalStorage();
+                updateLastUpdateDate();
+                refreshDashboard();
+                showToast('ล้างข้อมูลทั้งหมดแล้ว', 'warning');
+            });
+        }
+
+        function confirmModal(message, onConfirm) {
+            const overlay = document.createElement('div');
+            overlay.className = 'fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4';
+            overlay.innerHTML = `
+                <div class="sport-card rounded-2xl max-w-sm w-full p-5 border border-slate-700 shadow-2xl text-center">
+                    <div class="w-12 h-12 rounded-full bg-rose-500/20 text-rose-400 mx-auto flex items-center justify-center text-xl mb-3">
+                        <i class="fa-solid fa-triangle-exclamation"></i>
+                    </div>
+                    <h4 class="font-bold text-lg text-slate-100 mb-2">ยืนยันการทำรายการ</h4>
+                    <p class="text-xs text-slate-300 mb-5">${message}</p>
+                    <div class="flex justify-center gap-2">
+                        <button id="cancelBtn" class="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 text-xs font-semibold hover:bg-slate-700">ยกเลิก</button>
+                        <button id="okBtn" class="px-4 py-2 rounded-xl bg-rose-600 text-white text-xs font-bold hover:bg-rose-500">ยืนยันลบ</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(overlay);
+
+            overlay.querySelector('#cancelBtn').onclick = () => document.body.removeChild(overlay);
+            overlay.querySelector('#okBtn').onclick = () => {
+                document.body.removeChild(overlay);
+                onConfirm();
+            };
+        }
+
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toastContainer');
+            if (!container) return;
+            const toast = document.createElement('div');
+
+            let colors = 'bg-emerald-600 text-white';
+            let icon = 'fa-circle-check';
+
+            if (type === 'warning') {
+                colors = 'bg-amber-600 text-white';
+                icon = 'fa-triangle-exclamation';
+            } else if (type === 'info') {
+                colors = 'bg-blue-600 text-white';
+                icon = 'fa-circle-info';
+            }
+
+            toast.className = `pointer-events-auto flex items-center gap-2 px-4 py-3 rounded-xl shadow-lg ${colors} text-sm font-semibold transform transition-all duration-300 translate-y-2 opacity-0`;
+            toast.innerHTML = `<i class="fa-solid ${icon}"></i> <span>${message}</span>`;
+
+            container.appendChild(toast);
+
+            setTimeout(() => {
+                toast.classList.remove('translate-y-2', 'opacity-0');
+            }, 10);
+
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'translate-y-2');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        function openHistoryModal() {
+            renderHistoryModalData();
+            const modal = document.getElementById('historyModal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeHistoryModal() {
+            const modal = document.getElementById('historyModal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        function renderHistoryModalData() {
+            const periodMap = {};
+            students.forEach(s => {
+                const pKey = `ปีการศึกษา ${s.year || '2568'} (เทอม ${s.term || '1'})`;
+                if (!periodMap[pKey]) {
+                    periodMap[pKey] = { total: 0, normal: 0, overweight: 0, underweight: 0 };
+                }
+                periodMap[pKey].total++;
+                const info = calculateBMIInfo(s.weight, s.height, s.age, s.gender);
+                if (info.status === 'สมส่วน') periodMap[pKey].normal++;
+                else if (info.status === 'เริ่มอ้วน' || info.status === 'อ้วน') periodMap[pKey].overweight++;
+                else if (info.status === 'ผอม') periodMap[pKey].underweight++;
+            });
+
+            const labels = Object.keys(periodMap).sort();
+            const normalPercentages = labels.map(lbl => {
+                const item = periodMap[lbl];
+                return item.total > 0 ? parseFloat(((item.normal / item.total) * 100).toFixed(1)) : 0;
+            });
+
+            const ctx = document.getElementById('historyLineChart').getContext('2d');
+            if (historyLineChartInstance) historyLineChartInstance.destroy();
+
+            historyLineChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'ร้อยละนักเรียนน้ำหนักตามเกณฑ์สมส่วน (เกณฑ์กรมพลศึกษา %)',
+                        data: normalPercentages,
+                        borderColor: '#00F5D4',
+                        backgroundColor: 'rgba(0, 245, 212, 0.15)',
+                        fill: true,
+                        tension: 0.3,
+                        pointRadius: 6,
+                        pointHoverRadius: 8
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { ticks: { color: '#94A3B8', font: { family: 'Kanit' } }, grid: { color: 'rgba(255,255,255,0.05)' } },
+                        y: { min: 0, max: 100, ticks: { color: '#94A3B8', font: { family: 'Kanit' } }, grid: { color: 'rgba(255,255,255,0.05)' } }
+                    },
+                    plugins: {
+                        legend: { labels: { color: '#F8FAFC', font: { family: 'Kanit' } } }
+                    }
+                }
+            });
+
+            const tbody = document.getElementById('historyTableBody');
+            tbody.innerHTML = '';
+
+            labels.forEach(lbl => {
+                const item = periodMap[lbl];
+                const pct = item.total > 0 ? ((item.normal / item.total) * 100).toFixed(1) : 0;
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="p-3 font-semibold text-slate-100">${lbl}</td>
+                    <td class="p-3 text-center font-bold">${item.total}</td>
+                    <td class="p-3 text-center text-emerald-400 font-bold">${item.normal}</td>
+                    <td class="p-3 text-center text-emerald-300 font-bold">${pct}%</td>
+                    <td class="p-3 text-center text-orange-400 font-bold">${item.overweight}</td>
+                    <td class="p-3 text-center text-amber-400 font-bold">${item.underweight}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function renderCharts() {
+            const activeStudents = getFilteredPeriodStudents();
+
+            const counts = { 'สมส่วน': 0, 'ผอม': 0, 'เริ่มอ้วน': 0, 'อ้วน': 0 };
+            activeStudents.forEach(s => {
+                const info = calculateBMIInfo(s.weight, s.height, s.age, s.gender);
+                if (counts[info.status] !== undefined) {
+                    counts[info.status]++;
+                }
+            });
+
+            const bmiCtx = document.getElementById('bmiDoughnutChart').getContext('2d');
+            if (bmiDoughnutChartInstance) bmiDoughnutChartInstance.destroy();
+
+            bmiDoughnutChartInstance = new Chart(bmiCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['สมส่วน', 'ผอม', 'เริ่มอ้วน', 'อ้วน'],
+                    datasets: [{
+                        data: [counts['สมส่วน'], counts['ผอม'], counts['เริ่มอ้วน'], counts['อ้วน']],
+                        backgroundColor: ['#34D399', '#FBBF24', '#F97316', '#F43F5E'],
+                        borderWidth: 2,
+                        borderColor: '#1C2541'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    cutout: '70%'
+                }
+            });
+
+            const gradeMap = {};
+            activeStudents.forEach(s => {
+                if (!gradeMap[s.grade]) {
+                    gradeMap[s.grade] = { totalHeight: 0, totalWeight: 0, count: 0 };
+                }
+                gradeMap[s.grade].totalHeight += parseFloat(s.height);
+                gradeMap[s.grade].totalWeight += parseFloat(s.weight);
+                gradeMap[s.grade].count++;
+            });
+
+            const gradeLabels = Object.keys(gradeMap);
+            const avgHeights = gradeLabels.map(g => (gradeMap[g].totalHeight / gradeMap[g].count).toFixed(1));
+            const avgWeights = gradeLabels.map(g => (gradeMap[g].totalWeight / gradeMap[g].count).toFixed(1));
+
+            const shortGradeLabels = gradeLabels.map(g => {
+                return g.replace('อนุบาล ', 'อ.').replace('ประถมศึกษาปีที่ ', 'ป.').replace('มัธยมศึกษาปีที่ ', 'ม.');
+            });
+
+            const gradeCtx = document.getElementById('gradeBarChart').getContext('2d');
+            if (gradeBarChartInstance) gradeBarChartInstance.destroy();
+
+            gradeBarChartInstance = new Chart(gradeCtx, {
+                type: 'bar',
+                data: {
+                    labels: shortGradeLabels,
+                    datasets: [
+                        { label: 'ส่วนสูงเฉลี่ย (ซม.)', data: avgHeights, backgroundColor: '#3A86FF', borderRadius: 6 },
+                        { label: 'น้ำหนักเฉลี่ย (กก.)', data: avgWeights, backgroundColor: '#00F5D4', borderRadius: 6 }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { ticks: { color: '#94A3B8', font: { family: 'Kanit' } }, grid: { color: 'rgba(255,255,255,0.05)' } },
+                        y: { ticks: { color: '#94A3B8', font: { family: 'Kanit' } }, grid: { color: 'rgba(255,255,255,0.05)' } }
+                    },
+                    plugins: { legend: { labels: { color: '#F8FAFC', font: { family: 'Kanit' } } } }
+                }
+            });
+
+            const maleStats = { 'สมส่วน': 0, 'ผอม': 0, 'เริ่มอ้วน': 0, 'อ้วน': 0 };
+            const femaleStats = { 'สมส่วน': 0, 'ผอม': 0, 'เริ่มอ้วน': 0, 'อ้วน': 0 };
+
+            activeStudents.forEach(s => {
+                const info = calculateBMIInfo(s.weight, s.height, s.age, s.gender);
+                if (s.gender === 'ชาย') maleStats[info.status]++;
+                else if (s.gender === 'หญิง') femaleStats[info.status]++;
+            });
+
+            const genderCtx = document.getElementById('genderStackChart').getContext('2d');
+            if (genderStackChartInstance) genderStackChartInstance.destroy();
+
+            genderStackChartInstance = new Chart(genderCtx, {
+                type: 'bar',
+                data: {
+                    labels: ['สมส่วน', 'ผอม', 'เริ่มอ้วน', 'อ้วน'],
+                    datasets: [
+                        { label: 'ชาย', data: [maleStats['สมส่วน'], maleStats['ผอม'], maleStats['เริ่มอ้วน'], maleStats['อ้วน']], backgroundColor: '#3A86FF', borderRadius: 6 },
+                        { label: 'หญิง', data: [femaleStats['สมส่วน'], femaleStats['ผอม'], femaleStats['เริ่มอ้วน'], femaleStats['อ้วน']], backgroundColor: '#FF5722', borderRadius: 6 }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { ticks: { color: '#94A3B8', font: { family: 'Kanit' } }, grid: { color: 'rgba(255,255,255,0.05)' } },
+                        y: { ticks: { color: '#94A3B8', font: { family: 'Kanit' } }, grid: { color: 'rgba(255,255,255,0.05)' } }
+                    },
+                    plugins: { legend: { labels: { color: '#F8FAFC', font: { family: 'Kanit' } } } }
+                }
+            });
+        }
+
+        function exportToExcel() {
+            const periodStudents = getFilteredPeriodStudents();
+            if (!periodStudents || periodStudents.length === 0) {
+                showToast('ไม่มีข้อมูลสำหรับส่งออกเป็น Excel ในภาคเรียนนี้', 'warning');
+                return;
+            }
+
+            const exportData = periodStudents.map((s, idx) => {
+                const info = calculateBMIInfo(s.weight, s.height, s.age, s.gender);
+                return {
+                    'ลำดับ': idx + 1,
+                    'รหัสนักเรียน': s.studentId,
+                    'ชื่อ-นามสกุล': `${s.firstName} ${s.lastName}`,
+                    'เพศ': s.gender,
+                    'ระดับชั้น': s.grade,
+                    'ห้อง': s.room,
+                    'เลขที่': s.rollNo || '-',
+                    'อายุ (ปี)': s.age,
+                    'น้ำหนัก (กก.)': s.weight,
+                    'ส่วนสูง (ซม.)': s.height,
+                    'ค่า BMI': info.bmi,
+                    'แปลผลภาวะโภชนาการ (เกณฑ์กรมพลศึกษา)': info.status,
+                    'ข้อเสนอแนะด้านการส่งเสริมสุขภาพ': info.advice
+                };
+            });
+
+            let normalCount = 0, overweightCount = 0, underweightCount = 0;
+            periodStudents.forEach(s => {
+                const info = calculateBMIInfo(s.weight, s.height, s.age, s.gender);
+                if (info.status === 'สมส่วน') normalCount++;
+                else if (info.status === 'เริ่มอ้วน' || info.status === 'อ้วน') overweightCount++;
+                else if (info.status === 'ผอม') underweightCount++;
+            });
+
+            const summaryData = [
+                { 'ตัวชี้วัด': 'นักเรียนทั้งหมด (คน)', 'จำนวน': periodStudents.length },
+                { 'ตัวชี้วัด': 'น้ำหนักตามเกณฑ์ / สมส่วน (คน)', 'จำนวน': normalCount },
+                { 'ตัวชี้วัด': 'เริ่มอ้วน หรือ อ้วน (คน)', 'จำนวน': overweightCount },
+                { 'ตัวชี้วัด': 'ผอม / ต่ำกว่าเกณฑ์ (คน)', 'จำนวน': underweightCount },
+                { 'ตัวชี้วัด': 'สัดส่วนความสมส่วน (%)', 'จำนวน': ((normalCount / periodStudents.length) * 100).toFixed(1) + '%' }
+            ];
+
+            const wb = XLSX.utils.book_new();
+            const wsStudents = XLSX.utils.json_to_sheet(exportData);
+            const wsSummary = XLSX.utils.json_to_sheet(summaryData);
+
+            XLSX.utils.book_append_sheet(wb, wsStudents, "รายชื่อนักเรียน");
+            XLSX.utils.book_append_sheet(wb, wsSummary, "สรุปภาพรวม");
+
+            const period = getActivePeriod();
+            const fileName = `รายงานสุขภาพนักเรียน_เกณฑ์กรมพลศึกษา_${period.year}_เทอม${period.term}_${new Date().toISOString().slice(0,10)}.xlsx`;
+            XLSX.writeFile(wb, fileName);
+            showToast('ดาวน์โหลดไฟล์ Excel เรียบร้อยแล้ว!', 'success');
+        }
+
+        function exportDashboardImage() {
+            const target = document.getElementById('exportableDashboardArea');
+            showToast('กำลังประมวลผลรูปภาพ...', 'info');
+
+            html2canvas(target, {
+                backgroundColor: '#0F172A',
+                scale: 2,
+                useCORS: true
+            }).then(canvas => {
+                const link = document.createElement('a');
+                link.download = `Dashboard_SportHealth_${new Date().toISOString().slice(0,10)}.png`;
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+                showToast('ดาวน์โหลดรูปภาพ Dashboard สำเร็จ!', 'success');
+            }).catch(err => {
+                showToast('เกิดข้อผิดพลาดในการสร้างรูปภาพ', 'warning');
+                console.error(err);
+            });
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            loadFromLocalStorage();
+            if (!students || students.length === 0) {
+                seedSampleData();
+            } else {
+                updateLastUpdateDate();
+                refreshDashboard();
+            }
+        });
+    </script>
+</body>
+</html>
